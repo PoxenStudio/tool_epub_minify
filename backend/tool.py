@@ -19,6 +19,7 @@ import os
 import re
 import subprocess
 import threading
+import time
 import uuid
 from typing import Optional
 
@@ -34,6 +35,8 @@ POLISH_OPTIONS = ["-i", "-u", "-U"]
 POLISH_TIMEOUT = 10 * 60
 
 MAX_SEARCH_RESULTS = 50
+# 临时任务目录保留 7 天，之后在工具下次启动/首次使用时清理
+WORK_RETENTION_SECONDS = 7 * 24 * 60 * 60
 _JOB_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -51,6 +54,10 @@ class EpubMinify(BaseTool):
     _jobs_order: list = []
     _jobs_lock = threading.Lock()
     _MAX_JOBS = 20
+
+    # 进程内只执行一次临时目录清理
+    _cleanup_lock = threading.Lock()
+    _cleanup_done = False
 
     @staticmethod
     def info():
@@ -92,6 +99,35 @@ class EpubMinify(BaseTool):
             job = cls._jobs.get(job_id)
             return dict(job) if job else None
 
+    @classmethod
+    def _cleanup_old_work_dirs(cls, api) -> None:
+        """首次使用时删除超过 7 天的任务目录（每个进程只执行一次）。"""
+        with cls._cleanup_lock:
+            if cls._cleanup_done:
+                return
+            cls._cleanup_done = True
+        try:
+            root = api.storage.get_work_dir("")
+            now = time.time()
+            removed = 0
+            for name in os.listdir(root):
+                if not _JOB_ID_RE.match(name):
+                    continue
+                path = os.path.join(root, name)
+                try:
+                    if not os.path.isdir(path):
+                        continue
+                    if now - os.path.getmtime(path) <= WORK_RETENTION_SECONDS:
+                        continue
+                except OSError:
+                    continue
+                api.storage.cleanup_work_dir(path)
+                removed += 1
+            if removed:
+                logging.info("[epub_minify] 已清理 %d 个超过 7 天的临时目录", removed)
+        except Exception as err:  # noqa: BLE001
+            logging.warning("[epub_minify] 清理临时目录失败：%s", err)
+
     # ------------------------------------------------------------------
     # 搜索
     # ------------------------------------------------------------------
@@ -99,6 +135,8 @@ class EpubMinify(BaseTool):
     @AsyncService.register_function
     def search(self, query: str) -> list:
         """按书名搜索含 EPUB 的书籍。query 为空时返回书库中的 EPUB 书籍。"""
+        self._cleanup_old_work_dirs(self.api)
+
         query = (query or "").strip()
         expr = "format:epub"
         if query:
@@ -138,6 +176,8 @@ class EpubMinify(BaseTool):
     @AsyncService.register_function
     def start(self, book_id: int, mode: str) -> dict:
         """受理一次精简请求并投递到后台线程。mode: replace | download。"""
+        self._cleanup_old_work_dirs(self.api)
+
         if mode not in ("replace", "download"):
             raise ValueError(_("不支持的处理方式"))
 
