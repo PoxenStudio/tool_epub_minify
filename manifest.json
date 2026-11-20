@@ -1,0 +1,21 @@
+{
+  "tool_id": "epub_minify",
+  "name": "EPUB文件精简",
+  "description": "按书名搜索书库中的 EPUB 书籍，调用 ebook-polish 清理未使用 CSS、压缩图片并升级内部结构；只有体积变小时才下载或替换原文件。",
+  "revision": "0.1.0",
+  "author": "Horky",
+  "publish_date": "2026-11-20",
+  "core_api_version": "1.5.0",
+  "entry_backend": "tool.EpubMinify",
+  "entry_frontend": "index.html",
+  "page": "epub_minify",
+  "repo_url": "https://github.com/PoxenStudio/tool_epub_minify",
+  "locales": ["zh"],
+  "default_locale": "zh",
+  "api_routes": [
+    { "path": "search", "handler": "tool.SearchHandler" },
+    { "path": "start", "handler": "tool.StartHandler" },
+    { "path": "status", "handler": "tool.StatusHandler" },
+    { "path": "download", "handler": "tool.DownloadHandler" }
+  ]
+}

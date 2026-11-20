@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EPUB文件精简</title>
+  <link rel="stylesheet" href="lib/theme.css" />
+  <style>
+    .page-head { margin-bottom: 20px; }
+    .page-head h1 { margin: 0 0 4px; font-size: 1.55em; }
+    .page-head p { margin: 0; }
+
+    .card-title { margin: 0 0 6px; font-size: 1.05em; }
+    .hint { font-size: 0.9em; margin: 8px 0 0; line-height: 1.5; }
+
+    .search-field { position: relative; display: flex; align-items: center; margin-top: 14px; }
+    .search-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 76px 10px 38px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--mb-color-text);
+      background: transparent;
+      border: 1px solid var(--mb-color-border);
+      border-radius: 8px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--mb-color-primary); }
+    .search-input:disabled { opacity: 0.6; cursor: not-allowed; }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      width: 18px;
+      height: 18px;
+      fill: var(--mb-color-text-secondary);
+      pointer-events: none;
+    }
+    .search-clear {
+      position: absolute;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--mb-color-text-secondary);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .search-clear:hover { background: var(--mb-color-surface); color: var(--mb-color-text); }
+    .search-spinner {
+      position: absolute;
+      right: 14px;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--mb-color-border);
+      border-top-color: var(--mb-color-primary);
+      border-radius: 50%;
+      animation: search-spin 0.8s linear infinite;
+    }
+    @keyframes search-spin { to { transform: rotate(360deg); } }
+
+    .book-list { margin-top: 14px; max-height: 320px; overflow-y: auto; }
+    .book-row {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .book-row:hover { background: rgba(144, 202, 249, 0.15); }
+    .book-row.selected {
+      background: rgba(144, 202, 249, 0.25);
+      border-color: #90caf9;
+    }
+    .book-cover,
+    .book-cover-fallback {
+      flex: 0 0 auto;
+      width: 44px;
+      height: 44px;
+      margin-right: 12px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: var(--mb-color-surface);
+    }
+    .book-cover-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--mb-color-text-secondary);
+    }
+    .book-info { flex: 1 1 auto; min-width: 0; }
+    .book-title {
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.3;
+      white-space: normal;
+    }
+    .book-author {
+      font-size: 11px;
+      color: var(--mb-color-text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .book-format {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 0 6px;
+      font-size: 10px;
+      line-height: 16px;
+      color: var(--mb-color-primary);
+      border: 1px solid var(--mb-color-primary);
+      border-radius: 10px;
+    }
+    .book-check {
+      flex: 0 0 auto;
+      margin-left: 8px;
+      color: var(--mb-color-primary);
+      font-size: 18px;
+      line-height: 1;
+    }
+    .book-empty { padding: 16px 0; text-align: center; font-size: 13px; color: var(--mb-color-text-secondary); }
+    .list-loading { display: flex; justify-content: center; padding: 24px 0; }
+    .list-loading .search-spinner { position: static; width: 28px; height: 28px; border-width: 3px; }
+
+    .selected-book {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      margin-top: 12px;
+      border-radius: var(--mb-radius);
+      background: var(--mb-color-surface);
+    }
+    .selected-book .book-cover { width: 44px; height: 60px; margin-right: 0; }
+    .selected-book .book-cover-fallback { width: 44px; height: 60px; margin-right: 0; }
+
+    .mode-group { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 16px; }
+    .mode-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--mb-color-border);
+      border-radius: var(--mb-radius);
+      cursor: pointer;
+    }
+    .mode-option:hover { border-color: var(--mb-color-primary); }
+    .mode-option:has(input:checked) { border-color: var(--mb-color-primary); }
+    .mode-option input {
+      margin-top: 2px;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--mb-color-primary);
+    }
+    .mode-text { display: flex; flex-direction: column; gap: 3px; }
+    .mode-text .mode-desc {
+      font-size: 0.85em;
+      color: var(--mb-color-text-secondary);
+      line-height: 1.45;
+    }
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.9em;
+      margin-bottom: 8px;
+      gap: 12px;
+    }
+
+    .result-lines { margin: 0; padding: 0; list-style: none; }
+    .result-lines li {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 4px 0;
+      color: var(--mb-color-text);
+    }
+    .result-lines li + li { border-top: 1px dashed var(--mb-color-border); }
+    .result-lines .label { color: var(--mb-color-text-secondary); }
+    .result-head { margin-bottom: 8px; font-weight: 500; }
+    .result-head--success { color: var(--mb-color-success); }
+    .result-head--warning { color: var(--mb-color-warning); }
+    .result-head--error { color: var(--mb-color-error); }
+
+    .download-wrap { margin-top: 14px; }
+    a.mb-btn { text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="mb-container">
+    <header class="page-head">
+      <h1 data-i18n="app.title">EPUB文件精简</h1>
+      <p class="mb-text-secondary" data-i18n="app.subtitle">
+        调用 ebook-polish 清理未使用的 CSS、无损压缩图片并升级书籍内部结构。
+      </p>
+    </header>
+
+    <section class="mb-card">
+      <h2 class="card-title" data-i18n="search.title">搜索书籍</h2>
+      <p class="mb-text-secondary hint" data-i18n="search.hint">
+        只显示书库中带有 EPUB 文件的书籍，输入书名后回车搜索。
+      </p>
+      <div class="search-field">
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+        </svg>
+        <input
+          id="query"
+          class="search-input"
+          type="text"
+          autocomplete="off"
+          data-i18n-attr="placeholder:search.placeholder"
+          placeholder="输入书名关键字"
+        />
+        <span id="search-spinner" class="search-spinner" hidden></span>
+        <button id="clear-btn" class="search-clear" type="button" aria-label="清空" hidden>×</button>
+      </div>
+      <p id="search-status" class="mb-text-secondary hint"></p>
+      <div id="book-list" class="book-list" hidden></div>
+    </section>
+
+    <section id="run-card" class="mb-card" style="margin-top: 20px" hidden>
+      <h2 class="card-title" data-i18n="process.title">处理所选书籍</h2>
+      <div id="selected-book" class="selected-book"></div>
+
+      <div class="mode-group">
+        <label class="mode-option">
+          <input type="radio" name="mode" value="replace" checked />
+          <span class="mode-text">
+            <strong data-i18n="mode.replace">直接替换书籍文件</strong>
+            <span class="mode-desc" data-i18n="mode.replaceHint">
+              精简后体积变小时，用新文件覆盖书库中的原 EPUB。
+            </span>
+          </span>
+        </label>
+        <label class="mode-option">
+          <input type="radio" name="mode" value="download" />
+          <span class="mode-text">
+            <strong data-i18n="mode.download">下载精简后的文件</strong>
+            <span class="mode-desc" data-i18n="mode.downloadHint">
+              精简后体积变小时提供下载，不修改书库中的原文件。
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <button id="process-btn" class="mb-btn" type="button" data-i18n="process.start">开始精简</button>
+    </section>
+
+    <section id="progress-card" class="mb-card" style="margin-top: 20px" hidden>
+      <div class="progress-head">
+        <span id="progress-label"></span>
+        <span id="progress-pct"></span>
+      </div>
+      <div class="mb-progress-linear">
+        <div id="progress-bar" class="mb-progress-linear__bar"></div>
+      </div>
+      <p id="progress-detail" class="mb-text-secondary hint"></p>
+    </section>
+
+    <section id="result-card" class="mb-card" style="margin-top: 20px" hidden>
+      <h2 class="card-title" data-i18n="result.title">处理结果</h2>
+      <div id="result-box"></div>
+      <div id="download-wrap" class="download-wrap" hidden>
+        <a id="download-link" class="mb-btn" href="#" target="_blank" rel="noopener" data-i18n="result.download">下载精简后的文件</a>
+      </div>
+    </section>
+  </div>
+
+  <script src="/static/toolbox-bridge.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      var bridge = window.MyBooksToolBridge;
+      var i18n = window.MyBooksToolI18n.create();
+      var TOOL_ID = (bridge && bridge.toolId) || 'epub_minify';
+      var POLL_INTERVAL = 1000;
+
+      var state = {
+        books: [],
+        selected: null,
+        searching: false,
+        searched: false,
+        running: false,
+        jobId: '',
+        lastJob: null,
+        pollTimer: null,
+        statusKey: '',
+      };
+
+      function applyTheme(theme) {
+        document.body.setAttribute('data-theme', theme || 'light');
+      }
+      if (bridge) {
+        applyTheme(bridge.theme);
+        bridge.onThemeChange(applyTheme);
+      }
+
+      function t(key, params) {
+        return i18n.t(key, params);
+      }
+
+      function formatBytes(bytes) {
+        bytes = Number(bytes) || 0;
+        if (bytes <= 0) return '0 B';
+        var units = ['B', 'KB', 'MB', 'GB'];
+        var value = bytes;
+        var index = 0;
+        while (value >= 1024 && index < units.length - 1) {
+          value /= 1024;
+          index += 1;
+        }
+        var fixed = index === 0 ? 0 : 1;
+        return value.toFixed(fixed) + ' ' + units[index];
+      }
+
+      function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined && text !== null) node.textContent = text;
+        return node;
+      }
+
+      function elBy(id) {
+        return document.getElementById(id);
+      }
+
+      // ------------------------------------------------------------ 状态文案
+
+      function applySearchStatus(extra) {
+        var node = elBy('search-status');
+        if (!node) return;
+        var text = extra || (state.statusKey ? t(state.statusKey) : '');
+        node.textContent = text || '';
+        node.hidden = !text;
+      }
+
+      function setSearchStatus(key, extra) {
+        state.statusKey = key;
+        applySearchStatus(extra);
+      }
+
+      // ------------------------------------------------------------ 搜索结果
+
+      function makeCover(book) {
+        var cover = document.createElement('img');
+        cover.className = 'book-cover';
+        cover.alt = '';
+        cover.loading = 'lazy';
+        if (!book.cover) return el('div', 'book-cover-fallback', 'EPUB');
+        cover.src = book.cover;
+        cover.addEventListener('error', function () {
+          var fallback = el('div', 'book-cover-fallback', 'EPUB');
+          if (cover.parentNode) cover.parentNode.replaceChild(fallback, cover);
+        });
+        return cover;
+      }
+
+      function renderBooks() {
+        var list = elBy('book-list');
+        list.textContent = '';
+        if (!state.searching && !state.searched) {
+          list.hidden = true;
+          return;
+        }
+        list.hidden = false;
+
+        if (state.searching) {
+          var loading = el('div', 'list-loading');
+          loading.appendChild(el('span', 'search-spinner'));
+          list.appendChild(loading);
+          return;
+        }
+
+        if (!state.books.length) {
+          list.appendChild(el('div', 'book-empty', t('search.empty')));
+          return;
+        }
+
+        state.books.forEach(function (book) {
+          var selected = !!state.selected && state.selected.book_id === book.book_id;
+          var row = el('div', 'book-row' + (selected ? ' selected' : ''));
+          row.appendChild(makeCover(book));
+
+          var info = el('div', 'book-info');
+          info.appendChild(el('div', 'book-title', book.title || ('#' + book.book_id)));
+          info.appendChild(el('div', 'book-author', book.author || t('book.unknownAuthor')));
+          info.appendChild(el('span', 'book-format', 'EPUB'));
+          row.appendChild(info);
+
+          if (selected) row.appendChild(el('span', 'book-check', '✓'));
+
+          row.addEventListener('click', function () { toggleBook(book); });
+          list.appendChild(row);
+        });
+      }
+
+      function renderSelected() {
+        var box = elBy('selected-book');
+        box.textContent = '';
+        if (!state.selected) return;
+        var book = state.selected;
+
+        box.appendChild(makeCover(book));
+
+        var info = el('div', 'book-info');
+        info.appendChild(el('div', 'book-title', book.title || ('#' + book.book_id)));
+        info.appendChild(el(
+          'div', 'book-author',
+          (book.author || t('book.unknownAuthor')) + ' · EPUB ' + formatBytes(book.size)
+        ));
+
+        box.appendChild(info);
+      }
+
+      function toggleBook(book) {
+        if (state.running) return;
+        var isSame = !!state.selected && state.selected.book_id === book.book_id;
+        state.selected = isSame ? null : book;
+        elBy('run-card').hidden = !state.selected;
+        if (state.selected) renderSelected();
+        // 换书后清掉上一本的结果
+        state.lastJob = null;
+        state.jobId = '';
+        elBy('result-card').hidden = true;
+        elBy('progress-card').hidden = true;
+        renderBooks();
+      }
+
+      // ------------------------------------------------------------ 搜索
+
+      function updateSearchControls() {
+        var input = elBy('query');
+        elBy('search-spinner').hidden = !state.searching;
+        elBy('clear-btn').hidden = state.searching || state.running || !input.value;
+      }
+
+      function clearSearch() {
+        if (state.running) return;
+        elBy('query').value = '';
+        state.books = [];
+        state.selected = null;
+        state.searched = false;
+        state.searching = false;
+        state.lastJob = null;
+        state.jobId = '';
+        elBy('run-card').hidden = true;
+        elBy('progress-card').hidden = true;
+        elBy('result-card').hidden = true;
+        setSearchStatus('');
+        renderBooks();
+        updateSearchControls();
+      }
+
+      function doSearch() {
+        if (state.searching || state.running) return;
+
+        var input = elBy('query');
+        var query = input.value.trim();
+        if (!query) {
+          // 不输入书名不发起搜索
+          setSearchStatus('search.needQuery');
+          input.focus();
+          return;
+        }
+
+        state.searching = true;
+        state.searched = false;
+        state.books = [];
+        state.selected = null;
+        state.lastJob = null;
+        state.jobId = '';
+        elBy('run-card').hidden = true;
+        elBy('progress-card').hidden = true;
+        elBy('result-card').hidden = true;
+        setSearchStatus('');
+        renderBooks();
+        updateSearchControls();
+
+        bridge.fetch('search?q=' + encodeURIComponent(query))
+          .then(function (rsp) {
+            if (!rsp || rsp.err !== 'ok') {
+              throw new Error((rsp && rsp.msg) || t('error.unknown'));
+            }
+            state.books = rsp.data || [];
+          })
+          .catch(function (err) {
+            state.books = [];
+            setSearchStatus('search.failed', t('search.failed', { error: err.message || err }));
+          })
+          .then(function () {
+            state.searching = false;
+            state.searched = true;
+            renderBooks();
+            updateSearchControls();
+          });
+      }
+
+      // ------------------------------------------------------------ 处理
+
+      function setRunning(running) {
+        state.running = running;
+        elBy('process-btn').disabled = running;
+        elBy('query').disabled = running;
+        updateSearchControls();
+      }
+
+      function startProcess() {
+        if (!state.selected || state.running) return;
+        var modeNode = document.querySelector('input[name="mode"]:checked');
+        var mode = modeNode ? modeNode.value : 'replace';
+
+        state.lastJob = null;
+        state.jobId = '';
+        elBy('result-card').hidden = true;
+        elBy('download-wrap').hidden = true;
+        elBy('progress-card').hidden = false;
+        setProgress(0, 'queued');
+        setRunning(true);
+
+        bridge.fetch('start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: state.selected.book_id, mode: mode }),
+        })
+          .then(function (rsp) {
+            if (!rsp || rsp.err !== 'ok') {
+              throw new Error((rsp && rsp.msg) || t('error.unknown'));
+            }
+            state.jobId = rsp.data.job_id;
+            schedulePoll();
+          })
+          .catch(function (err) {
+            setRunning(false);
+            elBy('progress-card').hidden = true;
+            renderFailure(err.message || String(err));
+          });
+      }
+
+      function setProgress(progress, stage) {
+        var pct = Math.max(0, Math.min(100, Number(progress) || 0));
+        elBy('progress-bar').style.width = pct + '%';
+        elBy('progress-pct').textContent = pct + '%';
+        elBy('progress-label').textContent = t('stage.' + (stage || 'queued'));
+        elBy('progress-detail').textContent = state.selected
+          ? (state.selected.title || '')
+          : '';
+      }
+
+      function schedulePoll() {
+        if (state.pollTimer) {
+          clearTimeout(state.pollTimer);
+          state.pollTimer = null;
+        }
+        if (!state.jobId) return;
+        state.pollTimer = setTimeout(fetchStatus, POLL_INTERVAL);
+      }
+
+      function fetchStatus() {
+        state.pollTimer = null;
+        var jobId = state.jobId;
+        if (!jobId) return;
+        bridge.fetch('status?job_id=' + encodeURIComponent(jobId))
+          .then(function (rsp) {
+            if (!rsp || rsp.err !== 'ok') {
+              throw new Error((rsp && rsp.msg) || t('error.unknown'));
+            }
+            var job = rsp.data;
+            if (state.jobId !== jobId) return;
+            state.lastJob = job;
+            setProgress(job.progress, job.stage);
+            if (job.status === 'running') {
+              schedulePoll();
+              return;
+            }
+            setRunning(false);
+            elBy('progress-card').hidden = true;
+            if (job.status === 'failed') {
+              renderFailure(job.error || t('error.unknown'));
+            } else {
+              renderResult(job);
+            }
+          })
+          .catch(function (err) {
+            if (state.jobId !== jobId) return;
+            setRunning(false);
+            elBy('progress-card').hidden = true;
+            renderFailure(err.message || String(err));
+          });
+      }
+
+      // ------------------------------------------------------------ 结果
+
+      function renderStats(job) {
+        var list = el('ul', 'result-lines');
+        function add(labelKey, value) {
+          var li = document.createElement('li');
+          li.appendChild(el('span', 'label', t(labelKey)));
+          li.appendChild(el('span', null, value));
+          list.appendChild(li);
+        }
+        add('result.originalSize', formatBytes(job.old_size));
+        add('result.newSize', formatBytes(job.new_size));
+        if (job.status === 'completed') {
+          add('result.savedBytes', formatBytes(job.saved));
+          add('result.savedPercent', (Number(job.saved_percent) || 0) + '%');
+        }
+        return list;
+      }
+
+      function renderResult(job) {
+        var box = elBy('result-box');
+        box.textContent = '';
+        elBy('result-card').hidden = false;
+        elBy('download-wrap').hidden = true;
+        state.lastJob = job;
+
+        if (job.status === 'no_improvement') {
+          box.appendChild(el('div', 'result-head result-head--warning', t('result.notSmaller')));
+          box.appendChild(el('p', 'hint mb-text-secondary', t('result.notSmallerHint')));
+          box.appendChild(renderStats(job));
+          return;
+        }
+
+        if (job.status === 'completed' && job.replaced) {
+          box.appendChild(el('div', 'result-head result-head--success', t('result.replaced')));
+          box.appendChild(el('p', 'hint mb-text-secondary', t('result.replacedHint')));
+          box.appendChild(renderStats(job));
+          return;
+        }
+
+        if (job.status === 'completed' && job.download_ready) {
+          box.appendChild(el('div', 'result-head result-head--success', t('result.ready')));
+          box.appendChild(el('p', 'hint mb-text-secondary', t('result.readyHint')));
+          box.appendChild(renderStats(job));
+          var link = elBy('download-link');
+          link.href = '/api/toolbox/tool/' + TOOL_ID + '/download?job_id=' + encodeURIComponent(job.job_id);
+          elBy('download-wrap').hidden = false;
+          return;
+        }
+
+        box.appendChild(el('div', 'result-head result-head--success', t('result.done')));
+        box.appendChild(renderStats(job));
+      }
+
+      function renderFailure(message) {
+        var box = elBy('result-box');
+        box.textContent = '';
+        elBy('result-card').hidden = false;
+        elBy('download-wrap').hidden = true;
+        box.appendChild(el('div', 'result-head result-head--error', t('result.failed')));
+        box.appendChild(el('p', 'hint', message || t('error.unknown')));
+      }
+
+      // ------------------------------------------------------------ 初始化
+
+      function refreshDynamicTexts() {
+        applySearchStatus();
+        renderBooks();
+        if (state.selected) renderSelected();
+        if (state.lastJob && state.lastJob.status !== 'running') {
+          if (state.lastJob.status === 'failed') {
+            renderFailure(state.lastJob.error);
+          } else {
+            renderResult(state.lastJob);
+          }
+        }
+        if (state.running && state.lastJob) {
+          setProgress(state.lastJob.progress, state.lastJob.stage);
+        }
+      }
+
+      var searchInput = elBy('query');
+      searchInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          doSearch();
+        }
+      });
+      searchInput.addEventListener('input', updateSearchControls);
+      elBy('clear-btn').addEventListener('click', function () {
+        clearSearch();
+        searchInput.focus();
+      });
+      elBy('process-btn').addEventListener('click', startProcess);
+
+      setSearchStatus('');
+      updateSearchControls();
+      i18n.ready.then(function () {
+        refreshDynamicTexts();
+      });
+      i18n.onChange(refreshDynamicTexts);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "app.title": "EPUB文件精简",
+  "app.subtitle": "清理未使用的 CSS、无损压缩图片并升级书籍内部结构。",
+
+  "search.title": "搜索书籍",
+  "search.hint": "只显示书库中带有 EPUB 文件的书籍，输入书名后回车搜索。",
+  "search.placeholder": "输入书名关键字",
+  "search.needQuery": "请先输入书名再搜索。",
+  "search.empty": "没有找到包含 EPUB 文件的书籍。",
+  "search.failed": "搜索失败：{error}",
+
+  "book.unknownAuthor": "未知作者",
+
+  "process.title": "处理所选书籍",
+  "process.start": "开始精简",
+
+  "mode.replace": "直接替换书籍文件",
+  "mode.replaceHint": "精简后体积变小时，用新文件覆盖书库中的原 EPUB。",
+  "mode.download": "下载精简后的文件",
+  "mode.downloadHint": "精简后体积变小时提供下载，不修改书库中的原文件。",
+
+  "stage.queued": "等待处理…",
+  "stage.locating": "正在定位 EPUB 文件…",
+  "stage.polishing": "正在进行精简…",
+  "stage.comparing": "正在比较文件体积…",
+  "stage.saving": "正在写回书库…",
+  "stage.done": "处理完成",
+  "stage.failed": "处理失败",
+
+  "result.title": "处理结果",
+  "result.download": "下载精简后的文件",
+  "result.originalSize": "原文件大小",
+  "result.newSize": "精简后大小",
+  "result.savedBytes": "节省体积",
+  "result.savedPercent": "节省比例",
+  "result.done": "处理完成",
+  "result.replaced": "已替换书库中的 EPUB 文件",
+  "result.replacedHint": "书库中的原文件已被体积更小的新文件覆盖。",
+  "result.ready": "精简完成，可以下载",
+  "result.readyHint": "书库中的原文件没有被修改。",
+  "result.notSmaller": "精简后体积没有变小，未做处理",
+  "result.notSmallerHint": "新文件不小于原文件，已丢弃生成的文件，书库保持不变。",
+  "result.failed": "处理失败",
+
+  "error.unknown": "未知错误"
+}
