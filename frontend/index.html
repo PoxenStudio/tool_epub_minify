@@ -202,7 +202,6 @@
 <body>
   <div class="mb-container">
     <header class="page-head">
-      <h1 data-i18n="app.title">EPUB文件精简</h1>
       <p class="mb-text-secondary" data-i18n="app.subtitle">
         调用 ebook-polish 清理未使用的 CSS、无损压缩图片并升级书籍内部结构。
       </p>
@@ -300,6 +299,8 @@
         jobId: '',
         lastJob: null,
         pollTimer: null,
+        tickTimer: null,
+        shownPct: 0,
         statusKey: '',
       };
 
@@ -437,6 +438,8 @@
         // 换书后清掉上一本的结果
         state.lastJob = null;
         state.jobId = '';
+        stopProgressTick();
+        state.shownPct = 0;
         elBy('result-card').hidden = true;
         elBy('progress-card').hidden = true;
         renderBooks();
@@ -459,6 +462,8 @@
         state.searching = false;
         state.lastJob = null;
         state.jobId = '';
+        stopProgressTick();
+        state.shownPct = 0;
         elBy('run-card').hidden = true;
         elBy('progress-card').hidden = true;
         elBy('result-card').hidden = true;
@@ -485,6 +490,8 @@
         state.selected = null;
         state.lastJob = null;
         state.jobId = '';
+        stopProgressTick();
+        state.shownPct = 0;
         elBy('run-card').hidden = true;
         elBy('progress-card').hidden = true;
         elBy('result-card').hidden = true;
@@ -527,6 +534,8 @@
 
         state.lastJob = null;
         state.jobId = '';
+        stopProgressTick();
+        state.shownPct = 0;
         elBy('result-card').hidden = true;
         elBy('download-wrap').hidden = true;
         elBy('progress-card').hidden = false;
@@ -547,19 +556,51 @@
           })
           .catch(function (err) {
             setRunning(false);
+            stopProgressTick();
             elBy('progress-card').hidden = true;
             renderFailure(err.message || String(err));
           });
       }
 
-      function setProgress(progress, stage) {
-        var pct = Math.max(0, Math.min(100, Number(progress) || 0));
+      function paintProgress(pct, stage) {
+        pct = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+        state.shownPct = pct;
         elBy('progress-bar').style.width = pct + '%';
         elBy('progress-pct').textContent = pct + '%';
         elBy('progress-label').textContent = t('stage.' + (stage || 'queued'));
         elBy('progress-detail').textContent = state.selected
           ? (state.selected.title || '')
           : '';
+      }
+
+      function stopProgressTick() {
+        if (!state.tickTimer) return;
+        clearInterval(state.tickTimer);
+        state.tickTimer = null;
+      }
+
+      // polishing 阶段命令会长时间阻塞：每秒 +1，最多到 95 后等待命令返回
+      function startProgressTick(stage) {
+        if (state.tickTimer) return;
+        state.tickTimer = setInterval(function () {
+          if (state.shownPct >= 95) {
+            stopProgressTick();
+            return;
+          }
+          paintProgress(state.shownPct + 1, stage);
+        }, 1000);
+      }
+
+      function setProgress(progress, stage) {
+        var pct = Number(progress) || 0;
+        var stageKey = stage || 'queued';
+        if (stageKey === 'polishing') {
+          paintProgress(Math.max(pct, state.shownPct), stageKey);
+          startProgressTick(stageKey);
+          return;
+        }
+        stopProgressTick();
+        paintProgress(Math.max(pct, state.shownPct), stageKey);
       }
 
       function schedulePoll() {
@@ -599,6 +640,7 @@
           .catch(function (err) {
             if (state.jobId !== jobId) return;
             setRunning(false);
+            stopProgressTick();
             elBy('progress-card').hidden = true;
             renderFailure(err.message || String(err));
           });
